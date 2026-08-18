@@ -41,7 +41,16 @@ Configuración de símbolos, timeframes y umbrales: `config.yaml`.
 
 Dashboard: http://127.0.0.1:8000
 
-Endpoints: `/api/health`, `/api/candles`, `/api/fvgs`, `/api/orderbook/{symbol}`, `/api/heatmap/{symbol}`, `/api/alerts`, `/ws` (eventos en vivo).
+Endpoints: `/api/health`, `/api/candles`, `/api/fvgs`, `/api/orderbook/{symbol}`, `/api/heatmap/{symbol}`, `/api/liquidations/{symbol}`, `/api/alerts`, `/ws` (eventos en vivo).
+
+## Eventos y reglas adicionales
+
+Además de FVG, paredes e imbalance, el monitor genera estos eventos (configurables en `config.yaml`):
+
+- **Liquidaciones** — stream `forceOrder` de Binance: alerta por liquidación individual grande (`min_alert_usd`) y clusters por bucket de precio (`bucket_usd`, ventana `window_hours`). Se consultan en `/api/liquidations/{symbol}`.
+- **Reglas por activo** (`watchlist`) — cruces de precio (`price_target`, con escalera `price_ladder` para avisos por cada % adicional) y volúmenes de parada absolutos (`stop_volume`), editables en caliente desde el bot de Telegram.
+
+Eventos completos: `fvg_new`, `fvg_mitigated`, `wall`, `imbalance`, `large_order`, `order_blocks`, `price_target`, `stop_volume`, `liquidation`, `price_ladder` (lista en `alerts.enabled_events`).
 
 ## Formato de alerta (POST a `NOTIFY_API_URL`)
 
