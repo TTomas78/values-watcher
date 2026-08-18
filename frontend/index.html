@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>values-watcher</title>
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: -apple-system, monospace; background: #131722; color: #d1d4dc; }
+    header { display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: #1e222d; }
+    header h1 { font-size: 16px; }
+    select { background: #2a2e39; color: #d1d4dc; border: 1px solid #363c4e; padding: 4px 8px; border-radius: 4px; }
+    main { display: grid; grid-template-columns: 1fr 300px; gap: 8px; padding: 8px; }
+    #chart { height: 60vh; background: #1e222d; border-radius: 4px; }
+    .panel { background: #1e222d; border-radius: 4px; padding: 10px; overflow-y: auto; max-height: 60vh; }
+    .panel h2 { font-size: 12px; text-transform: uppercase; color: #787b86; margin-bottom: 8px; }
+    #book td { font-size: 11px; padding: 1px 4px; text-align: right; }
+    #book .ask { color: #f23645; }
+    #book .bid { color: #089981; }
+    #book .wall { background: #363c4e; font-weight: bold; }
+    #alerts { margin: 8px; background: #1e222d; border-radius: 4px; padding: 10px; max-height: 25vh; overflow-y: auto; }
+    .alert { font-size: 12px; padding: 4px 0; border-bottom: 1px solid #2a2e39; }
+    .alert .fvg_new { color: #089981; }
+    .alert .fvg_mitigated { color: #f23645; }
+    .alert .wall, .alert .imbalance { color: #ff9800; }
+    .bar-wrap { height: 6px; background: #2a2e39; border-radius: 3px; margin: 6px 0 12px; }
+    .bar { height: 6px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>values-watcher</h1>
+    <select id="symbol">
+      <option>BTCUSDT</option>
+      <option>ETHUSDT</option>
+      <option>SOLUSDT</option>
+    </select>
+    <select id="timeframe">
+      <option value="5m">5m</option>
+      <option value="15m">15m</option>
+    </select>
+    <span id="status" style="font-size:12px;color:#787b86">conectando…</span>
+  </header>
+  <main>
+    <div id="chart"></div>
+    <div class="panel">
+      <h2>Order book</h2>
+      <div id="imb"></div>
+      <table id="book" style="width:100%"></table>
+    </div>
+  </main>
+  <div id="alerts">
+    <h2 style="font-size:12px;text-transform:uppercase;color:#787b86">Alertas en vivo</h2>
+    <div id="alert-list"></div>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

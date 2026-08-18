@@ -1,0 +1,74 @@
+# Símbolos a monitorear (Binance USDⓈ-M Futures)
+symbols:
+  - BTCUSDT
+  - ETHUSDT
+  - SOLUSDT
+
+# Timeframes para velas y detección de FVG
+timeframes:
+  - 5m
+  - 15m
+
+orderbook:
+  depth_levels: 20        # niveles por lado que pedimos al stream
+  wall_multiplier: 5.0    # un nivel es "pared" si su tamaño > N × mediana
+  imbalance_threshold: 0.6  # imbalance bid/ask extremo (0.5 = neutro)
+
+alerts:
+  enabled: false          # PAUSADO: no se envían notificaciones
+  dedup_minutes: 30       # no repetir la misma alerta dentro de esta ventana
+  enabled_events:
+    - fvg_new
+    - fvg_mitigated
+    - wall
+    - imbalance
+    - large_order
+    - order_blocks
+    - price_target
+    - stop_volume
+    - liquidation
+    - price_ladder
+
+kiyotaka:
+  enabled: false           # sin polling: Kiyotaka solo se consulta bajo demanda (/orderblocks, /flujo)
+  poll_seconds: 300        # si se reactiva: heatmap pesa 10 de cuota; free = 10/min y 1000/día
+  interval: MINUTE
+  period: 1140
+  max_depth: 1000
+  block_size_target: 25        # bloques de ~25 USD (se ajusta al múltiplo del raw más cercano)
+  large_order_thresholds:      # volumen mínimo por bloque para alertar (en unidad del activo)
+    BTCUSDT: 300
+  critical_multiplier: 3.0     # ≥ 3× umbral → severidad critical
+  order_blocks_enabled: true   # resumen periódico de bloques grandes
+  order_blocks_interval_minutes: 15
+  order_blocks_range_usd: 2000 # rango ± alrededor del precio actual
+  order_blocks_min_volume: 300 # volumen mínimo por bloque (BTC)
+
+storage:
+  db_path: data/values_watcher.db
+
+liquidations:
+  bucket_usd: 50        # ancho del bucket de precio para clusters
+  min_alert_usd: 50000  # alerta por liquidación individual ≥ 50k USD
+  critical_multiplier: 5.0
+  window_hours: 24      # ventana de clusters en /api/liquidations
+
+api:
+  host: 127.0.0.1
+  port: 8000
+
+# Reglas por activo: cruces de precio y volúmenes de parada absolutos
+watch:
+  BTCUSDT:
+    price_targets: [63000, 65000]   # alerta al cruzar estos niveles
+    stop_volume: 500                # pared ≥ 500 BTC en el libro vivo
+    price_ladders:                  # escaleras: nivel + pasos %, una alerta por escalón
+      - level: 60000                # avisa al cruzar 60k hacia abajo...
+        step_pct: 1.0               # ...y por cada 1% adicional (59400, 58806, ...)
+        direction: below            # "below" | "above"
+  ETHUSDT:
+    price_targets: [1800, 2000]
+    stop_volume: 5000               # pared ≥ 5000 ETH
+  SOLUSDT:
+    price_targets: [70, 85]
+    stop_volume: 50000              # pared ≥ 50000 SOL
