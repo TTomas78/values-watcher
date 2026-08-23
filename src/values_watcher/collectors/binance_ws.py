@@ -110,9 +110,10 @@ class KlinePoller:
     def stop(self) -> None:
         self._stop.set()
 
-    async def fetch_closed(self, client: httpx.AsyncClient, symbol: str, tf: str) -> list[tuple[Candle, float]]:
+    async def fetch_closed(self, client: httpx.AsyncClient, symbol: str, tf: str,
+                           limit: int = 5) -> list[tuple[Candle, float]]:
         r = await client.get("/fapi/v1/klines",
-                             params={"symbol": symbol, "interval": tf, "limit": 5})
+                             params={"symbol": symbol, "interval": tf, "limit": limit})
         r.raise_for_status()
         now_ms = int(time.time() * 1000)
         closed = []

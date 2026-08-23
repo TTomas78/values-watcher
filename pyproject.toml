@@ -12,6 +12,8 @@ dependencies = [
     "pydantic-settings>=2.3",
     "pyyaml>=6.0",
     "aiosqlite>=0.20",
+    "TA-Lib>=0.4.28",
+    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]

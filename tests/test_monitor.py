@@ -108,3 +108,39 @@ async def test_monitor_liquidation_event_and_storage(db):
     clusters = await db.liquidation_clusters("BTCUSDT", since_ms=0, bucket_usd=50)
     assert len(clusters) == 2
     assert clusters[0]["usd"] == 317_500.0  # ordenado por USD desc
+
+
+async def test_monitor_emits_pattern_on_configured_timeframe(db):
+    events = []
+
+    async def handler(t, p):
+        events.append((t, p))
+
+    mon = LiveMonitor(["BTCUSDT"], ["5m"], db, on_event=handler,
+                      pattern_timeframes=["1h"], pattern_min_candles=50)
+    base = [c(i, 100, 100.5, 99.5, 100.3) for i in range(58)]
+    base.append(c(58, 100, 100.3, 96.8, 97.0))
+    base.append(c(59, 96.5, 101.5, 96.4, 101.2))  # engulfing alcista
+    for candle in base:
+        await mon.on_candle("BTCUSDT", "1h", candle, 10)
+
+    patterns = [p for t, p in events if t == "pattern"]
+    assert any(p["pattern"] == "engulfing" and p["direction"] == "bullish"
+               and p["timeframe"] == "1h" for p in patterns)
+
+
+async def test_monitor_ignores_pattern_on_other_timeframes(db):
+    events = []
+
+    async def handler(t, p):
+        events.append((t, p))
+
+    mon = LiveMonitor(["BTCUSDT"], ["5m"], db, on_event=handler,
+                      pattern_timeframes=["1h"], pattern_min_candles=50)
+    base = [c(i, 100, 100.5, 99.5, 100.3) for i in range(58)]
+    base.append(c(58, 100, 100.3, 96.8, 97.0))
+    base.append(c(59, 96.5, 101.5, 96.4, 101.2))
+    for candle in base:
+        await mon.on_candle("BTCUSDT", "5m", candle, 10)  # tf no configurado
+
+    assert not [e for e in events if e[0] == "pattern"]

@@ -320,3 +320,18 @@ async def test_oi_command(store, db):
     assert "Open interest BTCUSDT" in reply
     assert "2,100 BTC (+5.00% en 12h)" in reply
     assert "TOTAL OI: 6,300 BTC" in reply
+
+
+async def test_patterns_toggle(store, db):
+    bot, _, state = make_bot(store, db)
+
+    reply = await bot._dispatch("patterns", "off")
+    assert "pausadas" in reply
+    assert state["patterns"] is False
+
+    reply = await bot._dispatch("patterns", "")
+    assert "pausadas" in reply
+
+    reply = await bot._dispatch("patterns", "on")
+    assert "activadas" in reply
+    assert state["patterns"] is True

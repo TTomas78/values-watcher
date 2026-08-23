@@ -49,6 +49,12 @@ class LiquidationsConfig(BaseModel):
     window_hours: int = 24           # ventana del cluster en /api/liquidations
 
 
+class PatternsConfig(BaseModel):
+    enabled: bool = True
+    timeframes: list[str] = ["1h", "4h", "1d"]
+    min_candles: int = 50   # historial mínimo de velas cerradas para evaluar
+
+
 class ApiConfig(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8000
@@ -68,6 +74,7 @@ class AppConfig(BaseModel):
     kiyotaka: KiyotakaConfig = KiyotakaConfig()
     storage: StorageConfig = StorageConfig()
     liquidations: LiquidationsConfig = LiquidationsConfig()
+    patterns: PatternsConfig = PatternsConfig()
     api: ApiConfig = ApiConfig()
     watch: dict[str, WatchRule] = {}  # reglas por símbolo
 

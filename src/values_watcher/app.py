@@ -31,6 +31,9 @@ async def run() -> None:
     cfg = load_config()
     settings = load_settings()
 
+    pattern_tfs = cfg.patterns.timeframes if cfg.patterns.enabled else []
+    all_timeframes = list(dict.fromkeys(cfg.timeframes + pattern_tfs))
+
     db_path = Path(cfg.storage.db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
     db = Database(str(db_path))
@@ -46,12 +49,14 @@ async def run() -> None:
                        cfg.alerts.dedup_minutes)
     if not cfg.alerts.enabled:
         log.info("Alertas PAUSADAS (alerts.enabled=false en config.yaml)")
-    alerts_state = {"enabled": cfg.alerts.enabled}
+    alerts_state = {"enabled": cfg.alerts.enabled, "patterns": True}
     bot_holder: dict = {}
 
     async def on_event(event_type: str, payload: dict) -> None:
         await broadcaster.broadcast({"type": event_type, "payload": payload})
         if not alerts_state["enabled"]:
+            return
+        if event_type == "pattern" and not alerts_state.get("patterns", True):
             return
         bot = bot_holder.get("bot")
         if bot is not None and bot.enabled and event_type in BOT_ALERT_EVENTS:
@@ -69,6 +74,8 @@ async def run() -> None:
         watch={s: w.model_dump() for s, w in cfg.watch.items()},
         liq_min_alert_usd=cfg.liquidations.min_alert_usd,
         liq_critical_multiplier=cfg.liquidations.critical_multiplier,
+        pattern_timeframes=pattern_tfs,
+        pattern_min_candles=cfg.patterns.min_candles,
     )
 
     # Watchlist en caliente: overrides persistidos (comandos Telegram) pisan
@@ -92,7 +99,7 @@ async def run() -> None:
                              ob_block_size_target=cfg.kiyotaka.block_size_target)
     bot_holder["bot"] = bot
 
-    binance = BinanceCollector(cfg.symbols, cfg.timeframes,
+    binance = BinanceCollector(cfg.symbols, all_timeframes,
                                monitor.on_candle, monitor.on_book,
                                on_liquidation=monitor.on_liquidation)
     if cfg.kiyotaka.enabled:
@@ -127,17 +134,22 @@ async def run() -> None:
         wall_multiplier=cfg.orderbook.wall_multiplier,
         imbalance_threshold=cfg.orderbook.imbalance_threshold,
         on_event=lambda *_: asyncio.sleep(0),
+        pattern_timeframes=pattern_tfs,
+        pattern_min_candles=cfg.patterns.min_candles,
     )
-    warmup = KlinePoller(cfg.symbols, cfg.timeframes, muted.on_candle)
+    warmup = KlinePoller(cfg.symbols, all_timeframes, muted.on_candle)
     async with httpx.AsyncClient(base_url="https://fapi.binance.com", timeout=15.0) as http:
         for symbol in cfg.symbols:
-            for tf in cfg.timeframes:
+            for tf in all_timeframes:
                 try:
-                    for candle, volume in await warmup.fetch_closed(http, symbol, tf):
+                    # tfs de patrones necesitan historial suficiente para evaluar
+                    limit = cfg.patterns.min_candles + 1 if tf in pattern_tfs else 5
+                    for candle, volume in await warmup.fetch_closed(http, symbol, tf, limit=limit):
                         await muted.on_candle(symbol, tf, candle, volume)
                 except httpx.HTTPError as e:
                     log.warning("Warmup %s %s falló: %s", symbol, tf, e)
     monitor.trackers = muted.trackers  # conservar el estado FVG precargado
+    monitor._pattern_buffers = muted._pattern_buffers  # idem buffers de patrones
 
     await alert_client.start()
     log.info("values-watcher iniciado — dashboard: http://%s:%d",

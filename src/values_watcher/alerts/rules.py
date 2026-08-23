@@ -16,30 +16,34 @@ def dedup_key(event_type: str, payload: dict) -> str:
     """Clave de dedup estable por evento.
 
     - fvg_new/fvg_mitigated: mismo gap (symbol+tf+formed_at)
-    - wall: mismo lado y nivel de precio
+    - wall: por símbolo y lado (el precio exacto titila en cada tick
+      y haría única cada clave, espameando la misma pared)
     - imbalance: por símbolo y dirección del sesgo
     """
     if event_type.startswith("fvg"):
         return f"{event_type}:{payload['symbol']}:{payload['timeframe']}:{payload['formed_at']}"
     if event_type == "wall":
-        return f"wall:{payload['symbol']}:{payload['side']}:{payload['price']}"
+        return f"wall:{payload['symbol']}:{payload['side']}"
     if event_type == "imbalance":
         side = "bid" if payload["ratio"] >= 0.5 else "ask"
         return f"imbalance:{payload['symbol']}:{side}"
     if event_type == "large_order":
-        return f"large_order:{payload['symbol']}:{payload['side']}:{payload['price']}"
+        return f"large_order:{payload['symbol']}:{payload['side']}"
     if event_type == "order_blocks":
         return f"order_blocks:{payload['symbol']}"
     if event_type == "price_target":
         return f"price_target:{payload['symbol']}:{payload['target']}:{payload['crossed']}"
     if event_type == "stop_volume":
-        return f"stop_volume:{payload['symbol']}:{payload['side']}:{payload['price']}"
+        return f"stop_volume:{payload['symbol']}:{payload['side']}"
     if event_type == "liquidation":
         bucket = int(payload["price"] // 50 * 50)
         return f"liquidation:{payload['symbol']}:{payload['side']}:{bucket}"
     if event_type == "price_ladder":
         # un escalón = una notificación; tras el rearmado puede volver a avisar
         return f"price_ladder:{payload['symbol']}:{payload['level']}:{payload['step']}"
+    if event_type == "pattern":
+        return (f"pattern:{payload['symbol']}:{payload['timeframe']}"
+                f":{payload['pattern']}:{payload['open_time']}")
     return f"{event_type}:{json.dumps(payload, sort_keys=True)}"
 
 

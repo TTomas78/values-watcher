@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable
 
 from values_watcher.core.fvg import Candle, Fvg, FvgStatus, FvgTracker
 from values_watcher.core.orderbook import BookSnapshot, Wall, Imbalance, compute_imbalance, detect_walls
+from values_watcher.core.patterns import detect_patterns
 from values_watcher.core.watchlist import (
     PriceLadderTracker,
     PriceTargetTracker,
@@ -41,6 +42,8 @@ class LiveMonitor:
         watch: dict[str, dict] | None = None,
         liq_min_alert_usd: float = 50_000,
         liq_critical_multiplier: float = 5.0,
+        pattern_timeframes: list[str] | None = None,
+        pattern_min_candles: int = 50,
     ) -> None:
         self.db = db
         self.wall_multiplier = wall_multiplier
@@ -59,6 +62,9 @@ class LiveMonitor:
             {s: w.get("price_ladders", []) for s, w in watch.items()})
         self.liq_min_alert_usd = liq_min_alert_usd
         self.liq_critical_multiplier = liq_critical_multiplier
+        self.pattern_timeframes = set(pattern_timeframes or [])
+        self.pattern_min_candles = pattern_min_candles
+        self._pattern_buffers: dict[tuple[str, str], list[Candle]] = {}
         self._book_count = 0
 
     async def on_liquidation(self, liq) -> None:
@@ -76,6 +82,16 @@ class LiveMonitor:
 
     async def on_candle(self, symbol: str, tf: str, candle: Candle, volume: float) -> None:
         await self.db.insert_candle(symbol, tf, candle, volume)
+        if tf in self.pattern_timeframes:
+            buf = self._pattern_buffers.setdefault((symbol, tf), [])
+            buf.append(candle)
+            del buf[:-self.pattern_min_candles]
+            for p in detect_patterns(symbol, tf, buf, self.pattern_min_candles):
+                await self.on_event("pattern", {
+                    "symbol": symbol, "timeframe": tf, "pattern": p["name"],
+                    "direction": p["direction"], "close": candle.close,
+                    "open_time": candle.open_time,
+                })
         tracker = self.trackers.get((symbol, tf))
         if tracker is None:
             return

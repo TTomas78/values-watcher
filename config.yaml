@@ -28,6 +28,7 @@ alerts:
     - stop_volume
     - liquidation
     - price_ladder
+    - pattern
 
 kiyotaka:
   enabled: false           # sin polling: Kiyotaka solo se consulta bajo demanda (/orderblocks, /flujo)
@@ -72,3 +73,9 @@ watch:
   SOLUSDT:
     price_targets: [70, 85]
     stop_volume: 50000              # pared ≥ 50000 SOL
+
+# Patrones de velas (TA-Lib) sobre velas cerradas
+patterns:
+  enabled: true
+  timeframes: [1h, 4h, 1d]
+  min_candles: 50

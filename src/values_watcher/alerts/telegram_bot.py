@@ -52,6 +52,7 @@ BOT_COMMANDS = [
     ("precio", "Precio actual de los símbolos"),
     ("pause", "Pausar notificaciones"),
     ("resume", "Reanudar notificaciones"),
+    ("patterns", "Patrones de velas: /patterns [on|off]"),
     ("status", "Estado del sistema"),
     ("help", "Ayuda"),
 ]
@@ -343,9 +344,20 @@ class TelegramCommandBot:
         if cmd == "resume":
             self.alerts_state["enabled"] = True
             return "▶️ Notificaciones reanudadas."
+        if cmd == "patterns":
+            arg = args.strip().lower()
+            if arg == "on":
+                self.alerts_state["patterns"] = True
+                return "🕯 Notificaciones de patrones activadas."
+            if arg == "off":
+                self.alerts_state["patterns"] = False
+                return "🔕 Notificaciones de patrones pausadas."
+            pat = "activas" if self.alerts_state.get("patterns", True) else "pausadas"
+            return f"Patrones: {pat}. Usá /patterns on u /patterns off."
         if cmd == "status":
             estado = "activas" if self.alerts_state.get("enabled") else "pausadas"
-            return f"values-watcher OK · notificaciones {estado}"
+            pat = "activas" if self.alerts_state.get("patterns", True) else "pausadas"
+            return f"values-watcher OK · notificaciones {estado} · patrones {pat}"
         if cmd == "orderblocks":
             return await self._orderblocks(args)
         if cmd == "flujo":

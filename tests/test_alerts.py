@@ -78,11 +78,11 @@ def test_dedup_keys():
     fvg = {"symbol": "BTCUSDT", "timeframe": "5m", "formed_at": 123}
     assert dedup_key("fvg_new", fvg) == "fvg_new:BTCUSDT:5m:123"
     wall = {"symbol": "ETHUSDT", "side": "bid", "price": 3000.0}
-    assert dedup_key("wall", wall) == "wall:ETHUSDT:bid:3000.0"
+    assert dedup_key("wall", wall) == "wall:ETHUSDT:bid"
     assert dedup_key("imbalance", {"symbol": "SOLUSDT", "ratio": 0.7}).endswith(":bid")
     assert dedup_key("imbalance", {"symbol": "SOLUSDT", "ratio": 0.3}).endswith(":ask")
     lo = {"symbol": "BTCUSDT", "side": "bid", "price": 63850.0}
-    assert dedup_key("large_order", lo) == "large_order:BTCUSDT:bid:63850.0"
+    assert dedup_key("large_order", lo) == "large_order:BTCUSDT:bid"
 
 
 @respx.mock
@@ -95,6 +95,52 @@ async def test_rules_dedup(db):
     assert await rules.handle("fvg_new", payload)
     assert not await rules.handle("fvg_new", payload)  # duplicado
     assert not await rules.handle("wall", {"symbol": "BTCUSDT"})  # no habilitado
+
+
+@respx.mock
+async def test_rules_dedup_wall_price_ticks(db):
+    """Un muro que se mueve centavos no debe re-alertar dentro de la ventana."""
+    respx.post("https://api.example.com/notify").mock(return_value=httpx.Response(200))
+    client = AlertClient("https://api.example.com/notify", "k")
+    rules = AlertRules(client, db, ["wall"], dedup_minutes=30)
+
+    assert await rules.handle("wall", {"symbol": "BTCUSDT", "side": "ask",
+                                       "price": 63932.4, "quantity": 10, "multiple": 5.0})
+    assert not await rules.handle("wall", {"symbol": "BTCUSDT", "side": "ask",
+                                           "price": 63932.5, "quantity": 11, "multiple": 5.1})
+    # otro lado sí alerta
+    assert await rules.handle("wall", {"symbol": "BTCUSDT", "side": "bid",
+                                       "price": 63930.1, "quantity": 8, "multiple": 4.2})
+
+
+@respx.mock
+async def test_rules_dedup_large_order_price_ticks(db):
+    """Órdenes grandes en el mismo lado no re-alertan por ticks de precio."""
+    respx.post("https://api.example.com/notify").mock(return_value=httpx.Response(200))
+    client = AlertClient("https://api.example.com/notify", "k")
+    rules = AlertRules(client, db, ["large_order"], dedup_minutes=30)
+
+    assert await rules.handle("large_order", {"symbol": "BTCUSDT", "side": "bid",
+                                              "price": 63850.0, "quantity": 350})
+    assert not await rules.handle("large_order", {"symbol": "BTCUSDT", "side": "bid",
+                                                  "price": 63850.5, "quantity": 320})
+    assert await rules.handle("large_order", {"symbol": "BTCUSDT", "side": "ask",
+                                              "price": 63855.0, "quantity": 400})
+
+
+@respx.mock
+async def test_rules_dedup_stop_volume_price_ticks(db):
+    """Volumen de parada en el mismo lado no re-alerta por ticks de precio."""
+    respx.post("https://api.example.com/notify").mock(return_value=httpx.Response(200))
+    client = AlertClient("https://api.example.com/notify", "k")
+    rules = AlertRules(client, db, ["stop_volume"], dedup_minutes=30)
+
+    assert await rules.handle("stop_volume", {"symbol": "BTCUSDT", "side": "bid",
+                                              "price": 63800.0, "quantity": 600})
+    assert not await rules.handle("stop_volume", {"symbol": "BTCUSDT", "side": "bid",
+                                                  "price": 63800.5, "quantity": 550})
+    assert await rules.handle("stop_volume", {"symbol": "BTCUSDT", "side": "ask",
+                                              "price": 63900.0, "quantity": 700})
 
 
 async def test_rules_no_client(db):
@@ -110,3 +156,9 @@ def test_build_payload_order_blocks_uses_text():
     p = build_payload("order_blocks", {"symbol": "BTCUSDT", "text": "🐋 resumen"})
     assert p["severity"] == "info"
     assert p["detail"] == "🐋 resumen"
+
+
+def test_dedup_key_pattern():
+    p = {"symbol": "BTCUSDT", "timeframe": "1h", "pattern": "engulfing",
+         "open_time": 123456}
+    assert dedup_key("pattern", p) == "pattern:BTCUSDT:1h:engulfing:123456"
