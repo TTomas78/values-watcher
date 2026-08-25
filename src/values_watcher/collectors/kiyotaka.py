@@ -473,3 +473,60 @@ def build_oi_summary(symbol: str, hours: int, rows: list[dict]) -> str:
     lines.append(f"TOTAL OI: {total:,.0f} {base}")
     return (f"📊 Open interest {symbol}\n\n" + "\n".join(lines)
             + "\n\nFunding +: longs pagan (sesgo long) · −: shorts pagan (sesgo short)")
+
+
+def build_oi_summary_with_flow(symbol: str, hours: int, rows: list[dict],
+                               flow_rows: list[dict],
+                               flow_5m: list[dict] | None = None) -> str:
+    """Texto de open interest + funding + tendencia spot/futuros."""
+    base = symbol[:-4] if symbol.endswith("USDT") else symbol
+
+    def fmt_funding(f: float | None) -> str:
+        if f is None:
+            return "s/d"
+        icon = "🟢" if f > 0 else "🔴" if f < 0 else "⚪"
+        return f"{icon} {f:+.4f}%"
+
+    lines = []
+    total = 0.0
+    for r in rows:
+        if r["oi_now"] is None:
+            lines.append(f"⚪ {r['name']}: sin datos")
+            continue
+        total += r["oi_now"]
+        change = f"{r['oi_change_pct']:+.2f}%" if r["oi_change_pct"] is not None else "—"
+        arrow = "📈" if (r["oi_change_pct"] or 0) > 0 else "📉"
+        lines.append(f"{arrow} {r['name']}: {r['oi_now']:,.0f} {base} ({change} en {hours}h)"
+                     f" · funding {fmt_funding(r['funding_pct'])}")
+    lines.append(f"TOTAL OI: {total:,.0f} {base}")
+
+    def tendencia(buy: float, sell: float) -> tuple[str, str]:
+        if buy + sell == 0:
+            return "⚪", "sin datos"
+        ratio = buy / (buy + sell)
+        if ratio > 0.55:
+            return "🟢", "COMPRANDO"
+        elif ratio < 0.45:
+            return "🔴", "VENDIENDO"
+        return "🟡", "NEUTRO"
+
+    def flow_section(flow: list[dict], minutes: int) -> list[str]:
+        spot_buy = sum(r["buy"] for r in flow if r["kind"] == "spot")
+        spot_sell = sum(r["sell"] for r in flow if r["kind"] == "spot")
+        fut_buy = sum(r["buy"] for r in flow if r["kind"] == "futures")
+        fut_sell = sum(r["sell"] for r in flow if r["kind"] == "futures")
+        spot_icon, spot_txt = tendencia(spot_buy, spot_sell)
+        fut_icon, fut_txt = tendencia(fut_buy, fut_sell)
+        return [
+            f"⏱ Últimos {minutes} min",
+            f"{spot_icon} SPOT: {spot_txt} ({spot_buy:,.0f}/{spot_sell:,.0f} {base})",
+            f"{fut_icon} FUTUROS: {fut_txt} ({fut_buy:,.0f}/{fut_sell:,.0f} {base})",
+        ]
+
+    sections = ["\n\n📈 Tendencia\n" + "\n".join(flow_section(flow_rows, 15))]
+    if flow_5m:
+        sections.append("\n".join(flow_section(flow_5m, 5)))
+
+    return (f"📊 Open interest {symbol}\n\n" + "\n".join(lines)
+            + "".join(sections)
+            + "\n\nFunding +: longs pagan (sesgo long) · −: shorts pagan (sesgo short)")

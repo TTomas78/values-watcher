@@ -32,6 +32,7 @@ import re
 import httpx
 
 from values_watcher.collectors.kiyotaka import (
+    build_oi_summary_with_flow,
     KiyotakaCollector, build_flow_summary, build_oi_summary,
     build_order_blocks_summary, fetch_open_interest, fetch_trade_flow,
     iter_blocks)
@@ -434,6 +435,10 @@ class TelegramCommandBot:
         try:
             rows = await fetch_open_interest(client, symbol, hours,
                                              spacing=0 if self._http else 0.5)
+            flow_15m = await fetch_trade_flow(client, symbol, minutes=15,
+                                              spacing=0 if self._http else 0.5)
+            flow_5m = await fetch_trade_flow(client, symbol, minutes=5,
+                                             spacing=0 if self._http else 0.5)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
                 return ("⏳ Kiyotaka con la cuota ocupada. "
@@ -444,7 +449,7 @@ class TelegramCommandBot:
         finally:
             if owns:
                 await client.aclose()
-        return build_oi_summary(symbol, hours, rows)
+        return build_oi_summary_with_flow(symbol, hours, rows, flow_15m, flow_5m)
 
     async def _orderblocks(self, args: str) -> str:
         symbol = parse_symbol(args)

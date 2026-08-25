@@ -76,6 +76,8 @@ async def run() -> None:
         liq_critical_multiplier=cfg.liquidations.critical_multiplier,
         pattern_timeframes=pattern_tfs,
         pattern_min_candles=cfg.patterns.min_candles,
+        telegram_token=settings.telegram_bot_token,
+        telegram_chat_id=settings.telegram_chat_id,
     )
 
     # Watchlist en caliente: overrides persistidos (comandos Telegram) pisan
@@ -136,6 +138,8 @@ async def run() -> None:
         on_event=lambda *_: asyncio.sleep(0),
         pattern_timeframes=pattern_tfs,
         pattern_min_candles=cfg.patterns.min_candles,
+        telegram_token=settings.telegram_bot_token,
+        telegram_chat_id=settings.telegram_chat_id,
     )
     warmup = KlinePoller(cfg.symbols, all_timeframes, muted.on_candle)
     async with httpx.AsyncClient(base_url="https://fapi.binance.com", timeout=15.0) as http:
